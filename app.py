@@ -264,6 +264,8 @@ if queue["state"] == "running":
     for m, im in results.items():
         im.save(os.path.join(paths(partner)["draft"], f"{m}.jpg"), quality=95)
 
+    st.session_state["last_generated_partner"] = partner
+
     queue["current_index"] += 1
     save_queue(queue)
     st.rerun()
@@ -273,9 +275,17 @@ if queue["state"] == "running":
 # =================================================
 st.subheader("4️⃣ Review / Redo / Finalize")
 
+partner_list = df[PARTNER_NAME_COL].dropna().tolist()
+
+default_partner = st.session_state.get(
+    "last_generated_partner",
+    partner_list[0]
+)
+
 partner = st.selectbox(
     "Select partner",
-    df[PARTNER_NAME_COL].dropna().tolist()
+    partner_list,
+    index=partner_list.index(default_partner)
 )
 
 partner_folder = safe(partner)
