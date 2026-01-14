@@ -136,6 +136,33 @@ def save_queue(queue):
 def load_sheet():
     return pd.read_csv(GOOGLE_SHEET_CSV_URL)
 
+def zip_all_finalized():
+    zip_path = os.path.join(OUTPUT_ROOT, "all_finalized_calendars.zip")
+
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+        for partner_dir in os.listdir(OUTPUT_ROOT):
+            base = os.path.join(OUTPUT_ROOT, partner_dir)
+            final_dir = os.path.join(base, "final")
+
+            if not os.path.isdir(final_dir):
+                continue
+
+            status_file = os.path.join(base, "status.json")
+            if not os.path.exists(status_file):
+                continue
+
+            with open(status_file) as f:
+                status = json.load(f)
+
+            if status.get("state") != "final":
+                continue
+
+            for fname in os.listdir(final_dir):
+                fpath = os.path.join(final_dir, fname)
+                arcname = os.path.join(partner_dir, fname)
+                z.write(fpath, arcname=arcname)
+
+    return zip_path
 
 # =================================================
 # LOAD SHEET (MUST COME FIRST)
@@ -229,7 +256,6 @@ if c3.button("⏹ Stop Queue"):
 if c4.button("🧹 Clear Queue"):
     save_queue({"state": "stopped", "current_index": 0, "items": []})
     st.rerun()
-
 
 # =================================================
 # AUTO PROCESS QUEUE
@@ -357,3 +383,19 @@ if status["state"] == "final":
             file_name=os.path.basename(zip_path),
             mime="application/zip"
         )
+# =================================================
+# BULK DOWNLOAD – FINALIZED CALENDARS
+# =================================================
+st.subheader("📦 Bulk Downloads")
+
+if finalized:
+    zip_all_path = zip_all_finalized()
+    with open(zip_all_path, "rb") as f:
+        st.download_button(
+            "⬇️ Download ALL Finalized Calendars (ZIP)",
+            f,
+            file_name="all_finalized_calendars.zip",
+            mime="application/zip"
+        )
+else:
+    st.info("No finalized calendars yet")
