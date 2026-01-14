@@ -143,87 +143,6 @@ if "df" not in st.session_state:
 
 df = st.session_state.df
 
-
-# =================================================
-# REVIEW / REDO / FINALIZE  ✅ NOW SAFE
-# =================================================
-st.subheader("4️⃣ Review / Redo / Finalize")
-
-partner = st.selectbox(
-    "Select partner",
-    df[PARTNER_NAME_COL].dropna().tolist()
-)
-
-partner_folder = safe(partner)
-
-if drive_partner_exists(partner_folder):
-    st.info("📂 Existing calendar found in Google Drive")
-else:
-    st.warning("📭 No calendar found in Google Drive")
-
-init_state(partner)
-status = load_status(partner)
-p = paths(partner)
-
-img_dir = None
-allow_redo = False
-
-if status["state"] == "draft" and has_draft(partner):
-    img_dir = p["draft"]
-    allow_redo = True
-    st.info("📝 Draft mode — review and redo individual months")
-
-elif status["state"] == "final" and os.path.exists(p["final"]):
-    img_dir = p["final"]
-    st.success("✅ Finalized calendar")
-
-if img_dir:
-    cols = st.columns(4)
-    for i, m in enumerate(MONTHS):
-        img_path = os.path.join(img_dir, f"{m}.jpg")
-        if not os.path.exists(img_path):
-            continue
-        with cols[i % 4]:
-            st.image(img_path, caption=m, use_container_width=True)
-            if allow_redo:
-                if st.button(f"🔁 Redo {m}", key=f"redo_{partner}_{m}"):
-                    img = load_image_from_drive(
-                        df[df[PARTNER_NAME_COL] == partner].iloc[0][FILE_ID_COL]
-                    )
-                    new = regenerate_single_month(img, m)
-                    new.save(img_path, quality=95)
-                    st.rerun()
-
-if status["state"] == "draft" and has_draft(partner):
-    if st.button("✅ Finalize Calendar"):
-        os.makedirs(p["final"], exist_ok=True)
-        for f in os.listdir(p["draft"]):
-            shutil.copy(os.path.join(p["draft"], f), os.path.join(p["final"], f))
-
-        status["state"] = "final"
-        status["finalized_at"] = datetime.utcnow().isoformat()
-        save_status(partner, status)
-
-        try:
-            upload_final_folder_to_drive(safe(partner), p["final"])
-            st.success("✅ Calendar finalized and backed up to Google Drive")
-        except Exception as e:
-            st.warning("⚠️ Calendar finalized, but Drive upload failed")
-            st.exception(e)
-
-        st.rerun()
-
-if status["state"] == "final":
-    zip_path = zip_final(partner)
-    with open(zip_path, "rb") as f:
-        st.download_button(
-            "⬇️ Download Final Calendar (ZIP)",
-            f,
-            file_name=os.path.basename(zip_path),
-            mime="application/zip"
-        )
-
-
 # =================================================
 # PARTNER LIST
 # =================================================
@@ -342,3 +261,82 @@ if queue["state"] == "running":
     queue["current_index"] += 1
     save_queue(queue)
     st.rerun()
+
+# =================================================
+# REVIEW / REDO / FINALIZE  ✅ NOW SAFE
+# =================================================
+st.subheader("4️⃣ Review / Redo / Finalize")
+
+partner = st.selectbox(
+    "Select partner",
+    df[PARTNER_NAME_COL].dropna().tolist()
+)
+
+partner_folder = safe(partner)
+
+if drive_partner_exists(partner_folder):
+    st.info("📂 Existing calendar found in Google Drive")
+else:
+    st.warning("📭 No calendar found in Google Drive")
+
+init_state(partner)
+status = load_status(partner)
+p = paths(partner)
+
+img_dir = None
+allow_redo = False
+
+if status["state"] == "draft" and has_draft(partner):
+    img_dir = p["draft"]
+    allow_redo = True
+    st.info("📝 Draft mode — review and redo individual months")
+
+elif status["state"] == "final" and os.path.exists(p["final"]):
+    img_dir = p["final"]
+    st.success("✅ Finalized calendar")
+
+if img_dir:
+    cols = st.columns(4)
+    for i, m in enumerate(MONTHS):
+        img_path = os.path.join(img_dir, f"{m}.jpg")
+        if not os.path.exists(img_path):
+            continue
+        with cols[i % 4]:
+            st.image(img_path, caption=m, use_container_width=True)
+            if allow_redo:
+                if st.button(f"🔁 Redo {m}", key=f"redo_{partner}_{m}"):
+                    img = load_image_from_drive(
+                        df[df[PARTNER_NAME_COL] == partner].iloc[0][FILE_ID_COL]
+                    )
+                    new = regenerate_single_month(img, m)
+                    new.save(img_path, quality=95)
+                    st.rerun()
+
+if status["state"] == "draft" and has_draft(partner):
+    if st.button("✅ Finalize Calendar"):
+        os.makedirs(p["final"], exist_ok=True)
+        for f in os.listdir(p["draft"]):
+            shutil.copy(os.path.join(p["draft"], f), os.path.join(p["final"], f))
+
+        status["state"] = "final"
+        status["finalized_at"] = datetime.utcnow().isoformat()
+        save_status(partner, status)
+
+        try:
+            upload_final_folder_to_drive(safe(partner), p["final"])
+            st.success("✅ Calendar finalized and backed up to Google Drive")
+        except Exception as e:
+            st.warning("⚠️ Calendar finalized, but Drive upload failed")
+            st.exception(e)
+
+        st.rerun()
+
+if status["state"] == "final":
+    zip_path = zip_final(partner)
+    with open(zip_path, "rb") as f:
+        st.download_button(
+            "⬇️ Download Final Calendar (ZIP)",
+            f,
+            file_name=os.path.basename(zip_path),
+            mime="application/zip"
+        )
