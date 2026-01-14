@@ -18,7 +18,7 @@ from engine.drive_reader import drive_partner_exists
 # =================================================
 # PAGE CONFIG
 # =================================================
-st.set_page_config(page_title="Partner Calendar Generator — DEPLOY CHECK", layout="wide")
+st.set_page_config(page_title="Partner Calendar Generator", layout="wide")
 st.title("Partner Calendar Generator")
 st.info("⏳ Generation may take 2–5 minutes per partner. Please do not refresh.")
 
@@ -156,21 +156,10 @@ partner = st.selectbox(
 
 partner_folder = safe(partner)
 
-st.write("🔍 Checking Google Drive…")
-
-try:
-    exists = drive_partner_exists(partner_folder)
-    st.write("✅ Drive check completed")
-
-    if exists:
-        st.info("📂 Existing calendar found in Google Drive")
-    else:
-        st.warning("📭 No calendar found in Google Drive")
-
-except Exception as e:
-    st.error("❌ Drive check failed")
-    st.exception(e)
-
+if drive_partner_exists(partner_folder):
+    st.info("📂 Existing calendar found in Google Drive")
+else:
+    st.warning("📭 No calendar found in Google Drive")
 
 init_state(partner)
 status = load_status(partner)
@@ -206,9 +195,7 @@ if img_dir:
                     st.rerun()
 
 if status["state"] == "draft" and has_draft(partner):
-    finalize_clicked = st.button("✅ Finalize Calendar")
-    if finalize_clicked:
-        # Commit the local final folder
+    if st.button("✅ Finalize Calendar"):
         os.makedirs(p["final"], exist_ok=True)
         for f in os.listdir(p["draft"]):
             shutil.copy(os.path.join(p["draft"], f), os.path.join(p["final"], f))
@@ -217,21 +204,14 @@ if status["state"] == "draft" and has_draft(partner):
         status["finalized_at"] = datetime.utcnow().isoformat()
         save_status(partner, status)
 
-        # Show feedback first
-        st.success("✅ Calendar finalized locally — now uploading to Drive…")
-
-        # Try Drive upload
         try:
             upload_final_folder_to_drive(safe(partner), p["final"])
-            st.success("✅ Calendar uploaded to Google Drive")
+            st.success("✅ Calendar finalized and backed up to Google Drive")
         except Exception as e:
-            st.error("❌ Drive upload failed")
+            st.warning("⚠️ Calendar finalized, but Drive upload failed")
             st.exception(e)
 
-        # Important: update the `img_dir` so Streamlit shows the final images
-        img_dir = p["final"]
-
-        # No st.rerun() here
+        st.rerun()
 
 if status["state"] == "final":
     zip_path = zip_final(partner)
@@ -242,6 +222,7 @@ if status["state"] == "final":
             file_name=os.path.basename(zip_path),
             mime="application/zip"
         )
+
 
 # =================================================
 # PARTNER LIST
