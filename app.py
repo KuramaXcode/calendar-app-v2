@@ -11,6 +11,12 @@ from engine.calendar_generator import (
     generate_calendar_with_templates,
     regenerate_single_month
 )
+
+from engine.drive_reader import (
+    drive_partner_exists,
+    hydrate_partner_final_from_drive
+)
+
 from engine.drive_uploader import upload_final_folder_to_drive
 from engine.drive_reader import drive_partner_exists
 
@@ -291,9 +297,10 @@ if status["state"] == "draft" and has_draft(partner):
     allow_redo = True
     st.info("📝 Draft mode — review and redo individual months")
 
-elif status["state"] == "final" and os.path.exists(p["final"]):
+elif drive_partner_exists(safe(partner)):
+    hydrate_partner_final_from_drive(safe(partner), p["final"])
     img_dir = p["final"]
-    st.success("✅ Finalized calendar")
+    st.success("📂 Loaded finalized calendar from Google Drive")
 
 if img_dir:
     cols = st.columns(4)

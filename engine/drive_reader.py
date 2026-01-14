@@ -1,47 +1,82 @@
-import streamlit as st
+import os
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+import streamlit as st
+from io import BytesIO
 
-DRIVE_SCOPE = ["https://www.googleapis.com/auth/drive"]
+DRIVE_SCOPE = ["https://www.googleapis.com/auth/drive.readonly"]
 ROOT_FOLDER_NAME = "AI_Calendar_Final"
 
 
-def get_drive_service():
+def _get_drive_service():
     creds = Credentials.from_service_account_info(
         st.secrets["gcp_service_account"],
         scopes=DRIVE_SCOPE
     )
     return build("drive", "v3", credentials=creds)
 
-def drive_partner_exists(partner_folder_name: str) -> bool:
-    service = get_drive_service()
 
-    # Find root folder
-    root_query = (
-        f"name='{ROOT_FOLDER_NAME}' and "
-        f"mimeType='application/vnd.google-apps.folder' and trashed=false"
+def _get_folder_id(service, name, parent_id=None):
+    query = (
+        f"name='{name}' and mimeType='application/vnd.google-apps.folder' "
+        f"and trashed=false"
     )
-    root_res = service.files().list(
-        q=root_query,
-        fields="files(id)"
-    ).execute()
+    if parent_id:
+        query += f" and '{parent_id}' in parents"
 
-    roots = root_res.get("files", [])
-    if not roots:
+    res = service.files().list(q=query, fields="files(id, name)").execute()
+    files = res.get("files", [])
+    return files[0]["id"] if files else None
+
+
+def drive_partner_exists(partner_name: str) -> bool:
+    service = _get_drive_service()
+    root_id = _get_folder_id(service, ROOT_FOLDER_NAME)
+    if not root_id:
         return False
 
-    root_id = roots[0]["id"]
+    partner_id = _get_folder_id(service, partner_name, root_id)
+    return partner_id is not None
 
-    # Find partner folder inside root
-    partner_query = (
-        f"name='{partner_folder_name}' and "
-        f"mimeType='application/vnd.google-apps.folder' and "
-        f"'{root_id}' in parents and trashed=false"
-    )
 
-    partner_res = service.files().list(
-        q=partner_query,
-        fields="files(id)"
+def hydrate_partner_final_from_drive(partner_name: str, local_final_path: str):
+    """
+    Read-only hydration:
+    Downloads partner calendar images from Drive into local final folder
+    Used only for UI rendering
+    """
+    service = _get_drive_service()
+
+    root_id = _get_folder_id(service, ROOT_FOLDER_NAME)
+    if not root_id:
+        return False
+
+    partner_id = _get_folder_id(service, partner_name, root_id)
+    if not partner_id:
+        return False
+
+    os.makedirs(local_final_path, exist_ok=True)
+
+    results = service.files().list(
+        q=f"'{partner_id}' in parents and trashed=false",
+        fields="files(id, name)"
     ).execute()
 
-    return len(partner_res.get("files", [])) > 0
+    for f in results.get("files", []):
+        file_path = os.path.join(local_final_path, f["name"])
+        if os.path.exists(file_path):
+            continue  # do not overwrite
+
+        request = service.files().get_media(fileId=f["id"])
+        fh = BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+
+        with open(file_path, "wb") as out:
+            out.write(fh.getvalue())
+
+    return True
