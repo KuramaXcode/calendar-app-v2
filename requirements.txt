@@ -5,3 +5,5 @@ requests
 Pillow
 python-dotenv
 google-generativeai
+google-api-python-client
+google-auth
