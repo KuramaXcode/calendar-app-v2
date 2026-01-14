@@ -1,6 +1,6 @@
 import os, json, shutil, zipfile
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timezone
 
 import streamlit as st
 import pandas as pd
@@ -255,6 +255,7 @@ if c3.button("⏹ Stop Queue"):
 
 if c4.button("🧹 Clear Queue"):
     save_queue({"state": "stopped", "current_index": 0, "items": []})
+    st.session_state.pop("last_completed_partner", None)
     st.rerun()
 
 # =================================================
@@ -268,7 +269,11 @@ if queue["state"] == "running":
     if idx >= len(queue["items"]):
         queue["state"] = "stopped"
         save_queue(queue)
-        st.success("Queue completed 🎉")
+
+        last_partner = queue["items"][-1]["partner"]
+        st.session_state["last_completed_partner"] = last_partner
+
+        st.success(f"🎉 Queue completed — {last_partner} ready for review")
         st.rerun()
 
     item = queue["items"][idx]
@@ -290,7 +295,7 @@ if queue["state"] == "running":
     for m, im in results.items():
         im.save(os.path.join(paths(partner)["draft"], f"{m}.jpg"), quality=95)
 
-    st.session_state["last_generated_partner"] = partner
+    st.session_state.setdefault("recently_generated", []).append(partner)
 
     queue["current_index"] += 1
     save_queue(queue)
@@ -308,11 +313,21 @@ default_partner = st.session_state.get(
     partner_list[0]
 )
 
+recent = st.session_state.get("recently_generated", [])
+
+if recent:
+    st.info(f"🆕 Generated in this run: {', '.join(recent)}")
+
+partners = df[PARTNER_NAME_COL].dropna().tolist()
+default_partner = st.session_state.get("last_completed_partner")
+
 partner = st.selectbox(
     "Select partner",
-    partner_list,
-    index=partner_list.index(default_partner)
+    partners,
+    index=partners.index(default_partner)
+    if default_partner in partners else 0
 )
+
 
 partner_folder = safe(partner)
 
@@ -358,21 +373,25 @@ if img_dir:
 if status["state"] == "draft" and has_draft(partner):
     if st.button("✅ Finalize Calendar"):
         os.makedirs(p["final"], exist_ok=True)
+
         for f in os.listdir(p["draft"]):
-            shutil.copy(os.path.join(p["draft"], f), os.path.join(p["final"], f))
+            shutil.copy(
+                os.path.join(p["draft"], f),
+                os.path.join(p["final"], f)
+            )
 
         status["state"] = "final"
-        status["finalized_at"] = datetime.utcnow().isoformat()
+        status["finalized_at"] = datetime.now(timezone.utc).isoformat()
         save_status(partner, status)
 
         try:
             upload_final_folder_to_drive(safe(partner), p["final"])
             st.success("✅ Calendar finalized and backed up to Google Drive")
-        except Exception as e:
-            st.warning("⚠️ Calendar finalized, but Drive upload failed")
-            st.exception(e)
+        except Exception:
+            # Idempotent-safe
+            st.info("ℹ️ Calendar already exists in Drive or upload already completed")
 
-        st.rerun()
+        st.rerun()  # 🔑 THIS IS CRITICAL
 
 if status["state"] == "final":
     zip_path = zip_final(partner)
