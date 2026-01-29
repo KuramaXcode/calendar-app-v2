@@ -132,7 +132,7 @@ def save_queue(queue):
         json.dump(queue, f, indent=2)
 
 
-@st.cache_data
+
 def load_sheet():
     return pd.read_csv(GOOGLE_SHEET_CSV_URL)
 
