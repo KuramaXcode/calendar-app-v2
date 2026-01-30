@@ -394,7 +394,20 @@ if status["state"] == "draft" and has_draft(partner):
         st.rerun()  # 🔑 THIS IS CRITICAL
 
 if status["state"] == "final":
-    zip_path = zip_final(partner)
+    zip_path = os.path.join(
+        OUTPUT_ROOT,
+        f"{safe(partner)}_calendar.zip"
+    )
+
+    # Create ZIP ONLY if it does not exist
+    if not os.path.exists(zip_path):
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+            for fname in os.listdir(p["final"]):
+                z.write(
+                    os.path.join(p["final"], fname),
+                    arcname=fname
+                )
+
     with open(zip_path, "rb") as f:
         st.download_button(
             "⬇️ Download Final Calendar (ZIP)",
@@ -402,6 +415,7 @@ if status["state"] == "final":
             file_name=os.path.basename(zip_path),
             mime="application/zip"
         )
+
 # =================================================
 # BULK DOWNLOAD – FINALIZED CALENDARS
 # =================================================
