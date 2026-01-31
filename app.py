@@ -432,3 +432,64 @@ if finalized:
         )
 else:
     st.info("No finalized calendars yet")
+
+# =================================================
+# SINGLE-MONTH BULK GENERATION (ADMIN TOOL)
+# =================================================
+st.subheader("5️⃣ Single-Month Generation (Bulk)")
+st.caption("Generate a single calendar month for multiple partners without touching other months.")
+
+bulk_partners = st.multiselect(
+    "Select up to 10 partners",
+    df[PARTNER_NAME_COL].dropna().tolist(),
+    max_selections=10,
+    key="bulk_month_partners"
+)
+
+bulk_month = st.selectbox(
+    "Select month to generate",
+    MONTHS,
+    key="bulk_month_select"
+)
+
+if st.button("⚡ Generate Selected Month for All"):
+    if not bulk_partners:
+        st.warning("Please select at least one partner.")
+        st.stop()
+
+    st.info(f"Generating **{bulk_month}** for {len(bulk_partners)} partners")
+
+    progress = st.progress(0)
+    total = len(bulk_partners)
+
+    for idx, partner in enumerate(bulk_partners):
+        try:
+            row = df[df[PARTNER_NAME_COL] == partner].iloc[0]
+            file_id = row[FILE_ID_COL]
+
+            init_state(partner)
+            p = paths(partner)
+
+            partner_img = load_image_from_drive(file_id)
+
+            # 🔑 CORE CALL — existing generator
+            new_img = regenerate_single_month(partner_img, bulk_month)
+
+            # Always save to draft (safe)
+            os.makedirs(p["draft"], exist_ok=True)
+            new_img.save(
+                os.path.join(p["draft"], f"{bulk_month}.jpg"),
+                quality=95
+            )
+
+            st.success(f"✅ {partner} — {bulk_month} updated")
+
+        except Exception as e:
+            st.error(f"❌ {partner} failed")
+            st.exception(e)
+
+        progress.progress((idx + 1) / total)
+
+    st.success("🎉 Bulk month generation completed")
+    st.rerun()
+
