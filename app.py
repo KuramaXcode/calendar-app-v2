@@ -492,4 +492,11 @@ if st.button("⚡ Generate Selected Month for All"):
 
     st.success("🎉 Bulk month generation completed")
     st.rerun()
+        # 🔁 Force UI to refresh into Review mode
+    st.session_state["last_completed_partner"] = bulk_partners[-1]
+    st.success("🎉 Month generation completed. Scroll up to review.")
+    st.rerun()
+
+
+
 
