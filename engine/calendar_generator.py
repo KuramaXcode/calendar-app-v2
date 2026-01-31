@@ -76,6 +76,11 @@ Bottom-right: ({crop[2]}, {crop[3]})
 Make the person resemble the partner in the reference photo.
 Keep pose, body position, skin tone, clothing style, and illustration style consistent.
 
+If the reference person is a woman:
+- Adjust clothing to match feminine attire
+- Keep pose and body proportions natural
+- Do not masculinize the appearance
+
 Do not change calendar layout, dates, text, background, colors, or framing.
 """
 
