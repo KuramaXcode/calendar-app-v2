@@ -74,6 +74,7 @@ Top-left: ({crop[0]}, {crop[1]})
 Bottom-right: ({crop[2]}, {crop[3]})
 
 Make the person resemble the partner in the reference photo.
+This person is south-indian female, so please adjust the clothes according to an indian woman. 
 Keep pose, body position, skin tone, clothing style, and illustration style consistent.
 
 Keep Aspect Ratio: 1:1
